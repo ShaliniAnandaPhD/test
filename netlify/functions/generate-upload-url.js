@@ -1,11 +1,10 @@
 // netlify/functions/generate-upload-url.js
 
-// Using modern ES Module 'import' syntax instead of 'require'.
-// This can resolve conflicts in the Netlify build environment.
-import { getStore } from '@netlify/blobs';
-import { v4 as uuidv4 } from 'uuid';
+// Reverting to CommonJS 'require' syntax for consistency across all functions.
+const { getStore } = require('@netlify/blobs');
+const { v4: uuidv4 } = require('uuid');
 
-export const handler = async (event) => {
+exports.handler = async (event) => {
     // This function only accepts GET requests.
     if (event.httpMethod !== 'GET') {
         return {
@@ -47,4 +46,3 @@ export const handler = async (event) => {
         };
     }
 };
-
