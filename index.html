@@ -76,7 +76,7 @@
         <main class="space-y-8">
             <section id="input-panel" class="glass-panel p-6 sm:p-8 space-y-6">
                 <div>
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">🎵</span> Step 1: Upload Your Song</h2>
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">[1]</span> Step 1: Upload Your Song</h2>
                     <div id="file-drop-zone" class="border-2 border-dashed border-gray-600 p-8 text-center rounded-lg cursor-pointer transition hover:border-purple-500 hover:bg-purple-500/10">
                         <input type="file" id="audio-file-input" class="hidden" accept="audio/*">
                         <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
@@ -84,7 +84,7 @@
                     </div>
                 </div>
                 <div>
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">🎂</span> Step 2: Personalize Your Album</h2>
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">[2]</span> Step 2: Personalize Your Album</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">Album Title</label>
@@ -97,7 +97,7 @@
                     </div>
                 </div>
                 <div>
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">✨</span> Step 3: Describe Your Memory Experiences</h2>
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center"><span class="text-2xl mr-2">[3]</span> Step 3: Describe Your Memory Experiences</h2>
                     <div id="experience-inputs" class="space-y-3"></div>
                     <button id="add-experience" class="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mt-3">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -109,14 +109,14 @@
 
             <section id="processing-panel" class="glass-panel p-6 sm:p-8 text-center hidden">
                  <div class="mb-6">
-                    <div class="vinyl-spin text-6xl mb-4">💿</div>
+                    <div class="vinyl-spin text-6xl mb-4">(O)</div>
                     <h2 id="processing-header" class="font-orbitron text-2xl font-bold text-white mb-2">Processing Your Album</h2>
                     <p id="processing-status" class="text-purple-300">Your album is being created in the background. This may take a few minutes...</p>
                 </div>
             </section>
 
             <section id="results-panel" class="glass-panel p-6 sm:p-8 text-center hidden">
-                <h2 class="font-orbitron text-3xl font-bold text-white mb-6">🎉 Your Album is Ready!</h2>
+                <h2 class="font-orbitron text-3xl font-bold text-white mb-6">Success! Your Album is Ready!</h2>
                 <p id="result-message" class="text-lg text-gray-300 mb-6"></p>
                 <a id="download-button" href="#" class="inline-block btn-primary text-white font-bold py-4 px-8 rounded-lg text-lg">Download Album (ZIP)</a>
                  <button id="create-another" class="mt-4 w-full md:w-auto md:inline-block bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition">Create Another</button>
@@ -155,7 +155,7 @@
         function handleFileSelect(file) {
             if (!file || !file.type.startsWith('audio/')) return;
             inputFile = file;
-            fileLabel.textContent = `🎵 ${file.name}`;
+            fileLabel.textContent = `File: ${file.name}`;
             updateCreateButton();
         }
 
@@ -208,13 +208,19 @@
         async function handleSubmit() {
             inputPanel.classList.add('hidden');
             processingPanel.classList.remove('hidden');
-
+            
             try {
                 processingHeader.textContent = 'Preparing Upload...';
                 processingStatus.textContent = 'Getting a secure link to upload your file.';
 
                 const urlResponse = await fetch('/.netlify/functions/generate-upload-url');
-                if (!urlResponse.ok) throw new Error('Could not prepare upload.');
+                
+                if (!urlResponse.ok) {
+                    const err = new Error('Server returned an error during URL generation.');
+                    err.response = urlResponse;
+                    throw err;
+                }
+
                 const { uploadUrl, jobId } = await urlResponse.json();
 
                 processingStatus.textContent = 'Uploading your audio file...';
@@ -223,7 +229,11 @@
                     body: inputFile,
                     headers: { 'Content-Type': 'application/octet-stream' }
                 });
-                if (!uploadResponse.ok) throw new Error('File upload failed.');
+                if (!uploadResponse.ok) {
+                     const err = new Error('Server returned an error during file upload.');
+                    err.response = uploadResponse;
+                    throw err;
+                }
 
                 processingStatus.textContent = 'Starting the album creation process...';
                 const metadata = {
@@ -239,7 +249,11 @@
                     body: JSON.stringify(metadata),
                 });
 
-                if (!processResponse.ok) throw new Error('Failed to start processing.');
+                if (!processResponse.ok) {
+                    const err = new Error('Server returned an error while starting the process.');
+                    err.response = processResponse;
+                    throw err;
+                }
 
                 processingHeader.textContent = 'Processing Your Album';
                 processingStatus.textContent = 'Your album is being created in the background. This may take a few minutes...';
@@ -248,7 +262,15 @@
             } catch (error) {
                 console.error('Submission error:', error);
                 processingHeader.textContent = 'An Error Occurred';
-                processingStatus.textContent = error.message;
+
+                if (error && error.response) {
+                    const serverErrorBody = await error.response.text();
+                    processingStatus.textContent = `Error from server (${error.response.status}): ${serverErrorBody || error.message}`;
+                } else if (error) {
+                    processingStatus.textContent = `Could not prepare upload. Details: ${error.message}`;
+                } else {
+                    processingStatus.textContent = 'An unknown error occurred during the submission process.';
+                }
             }
         }
         
