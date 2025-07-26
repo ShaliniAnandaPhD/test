@@ -20,7 +20,6 @@
   # Name of the blob store we will use
   audio_uploads = "Audio Uploads"
 
-# Configure the background function to run longer
-[functions."process-audio-background"]
-  schedule = "@asap" # This makes it a background function
+# NOTE: The background function is automatically detected by its filename
+# ending in "-background.js", so no extra configuration is needed here.
 
