@@ -196,20 +196,26 @@
             formData.append('experiences', JSON.stringify(experiences));
 
             try {
-                // The endpoint for our Netlify Function
                 const response = await fetch('/.netlify/functions/process-audio', {
                     method: 'POST',
                     body: formData,
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Server error');
+                    let errorMessage = 'A server error occurred.';
+                    // Gracefully handle non-JSON error responses (like timeouts)
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || 'Unknown server error.';
+                    } catch (e) {
+                        const errorText = await response.text();
+                        errorMessage = `The server returned an error: ${errorText}`;
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 const result = await response.json();
                 
-                // Create a downloadable link from the base64 data
                 const blob = new Blob([Uint8Array.from(atob(result.zip), c => c.charCodeAt(0))], { type: 'application/zip' });
                 const url = URL.createObjectURL(blob);
 
@@ -256,3 +262,4 @@
     </script>
 </body>
 </html>
+
