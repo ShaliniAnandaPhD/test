@@ -20,6 +20,7 @@ function parseMultipartForm(event) {
 
         busboy.on('file', (fieldname, file, { filename, encoding, mimeType }) => {
             const saveTo = path.join(os.tmpdir(), `upload_${Date.now()}_${filename}`);
+            console.log(`Saving uploaded file to: ${saveTo}`);
             const writeStream = fs.createWriteStream(saveTo);
             file.pipe(writeStream);
 
@@ -58,6 +59,7 @@ const memoryThemes = {
 
 // Main serverless function handler
 exports.handler = async (event) => {
+    console.log('Netlify function invoked.');
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
@@ -65,7 +67,10 @@ exports.handler = async (event) => {
     const tempFiles = []; // Keep track of files to clean up
 
     try {
+        console.log('Parsing multipart form data...');
         const { fields, uploads } = await parseMultipartForm(event);
+        console.log('Form data parsed successfully.');
+
         const { albumTitle, recipientName } = fields;
         const experiences = JSON.parse(fields.experiences);
         const uploadedFile = uploads.audio;
@@ -74,13 +79,18 @@ exports.handler = async (event) => {
             throw new Error('No audio file uploaded or file failed to save.');
         }
         tempFiles.push(uploadedFile.filepath);
+        console.log(`Uploaded file path: ${uploadedFile.filepath}`);
 
         const zip = new JSZip();
+        console.log('Creating readme and adding original file to zip...');
         zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}\n\nCreated with Memory Album Creator.`);
         zip.file('01_original.mp3', fs.readFileSync(uploadedFile.filepath));
+        console.log('Original file added.');
 
         for (let i = 0; i < experiences.length; i++) {
             const experienceText = experiences[i];
+            console.log(`Starting processing for experience ${i + 1}: "${experienceText}"`);
+            
             let selectedThemeKey = 'default';
             for (const key in memoryThemes) {
                 if (experienceText.toLowerCase().includes(key)) {
@@ -92,6 +102,7 @@ exports.handler = async (event) => {
             const outputFilePath = path.join(os.tmpdir(), `output_${Date.now()}_${i}.mp3`);
             tempFiles.push(outputFilePath);
 
+            console.log(`Applying FFmpeg filter for track ${i + 1}...`);
             await new Promise((resolve, reject) => {
                 ffmpeg(uploadedFile.filepath)
                     .audioFilter(themeData.filters)
@@ -102,13 +113,16 @@ exports.handler = async (event) => {
                     .on('end', () => resolve())
                     .save(outputFilePath);
             });
+            console.log(`FFmpeg processing complete for track ${i + 1}. Adding to zip.`);
             
             const trackFilename = `${String(i + 2).padStart(2, '0')}_${selectedThemeKey}_remix.mp3`;
             zip.file(trackFilename, fs.readFileSync(outputFilePath));
         }
 
+        console.log('All tracks processed. Generating zip file...');
         const zipData = await zip.generateAsync({ type: 'base64' });
         const zipFilename = `${albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'memory_album'}.zip`;
+        console.log('Zipping complete. Sending response to client.');
 
         return {
             statusCode: 200,
@@ -121,13 +135,13 @@ exports.handler = async (event) => {
         };
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('!!! CRITICAL ERROR in function execution:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message || 'An internal error occurred.' }),
         };
     } finally {
-        // Cleanup temporary files
+        console.log('Cleaning up temporary files...');
         tempFiles.forEach(file => {
             try {
                 if (fs.existsSync(file)) {
@@ -137,6 +151,8 @@ exports.handler = async (event) => {
                 console.error(`Failed to delete temp file: ${file}`, err);
             }
         });
+        console.log('Cleanup complete.');
     }
 };
+
 
