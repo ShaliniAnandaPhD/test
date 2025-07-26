@@ -10,13 +10,13 @@
     # Use Node.js 18 for compatibility with dependencies
     NODE_VERSION = "18"
 
-# Explicitly define the functions directory. This helps ensure the
-# settings below are applied correctly.
+# Explicitly define the functions directory.
+# ALL of your function files must be moved into this directory.
 [functions]
   directory = "netlify/functions"
 
 # Configuration for ALL Netlify Functions.
-# The wildcard "*" applies these settings to every function.
+# The wildcard "*" applies these settings to every function in the directory above.
 [functions."*"]
   node_bundler = "esbuild"
   # CRITICAL FIX: This line tells the bundler NOT to include the
