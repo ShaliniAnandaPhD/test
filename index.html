@@ -140,6 +140,7 @@
         const resultMessage = document.getElementById('result-message');
         const createAnotherButton = document.getElementById('create-another');
         const processingHeader = document.getElementById('processing-header');
+        const processingStatus = document.getElementById('processing-status');
         
         let inputFile = null;
         let pollInterval = null;
@@ -195,7 +196,7 @@
                     } else if (data.status === 'failed') {
                         clearInterval(pollInterval);
                         processingHeader.textContent = 'An Error Occurred';
-                        document.getElementById('processing-status').textContent = data.error || 'Processing failed. Please try again.';
+                        processingStatus.textContent = data.error || 'Processing failed. Please try again.';
                     }
                 } catch (error) {
                     console.error('Polling error:', error);
@@ -209,20 +210,22 @@
             processingPanel.classList.remove('hidden');
 
             try {
-                // Step 1: Upload the audio file directly
-                const uploadResponse = await fetch('/.netlify/functions/upload-audio', {
+                processingHeader.textContent = 'Preparing Upload...';
+                processingStatus.textContent = 'Getting a secure link to upload your file.';
+
+                const urlResponse = await fetch('/.netlify/functions/generate-upload-url');
+                if (!urlResponse.ok) throw new Error('Could not prepare upload.');
+                const { uploadUrl, jobId } = await urlResponse.json();
+
+                processingStatus.textContent = 'Uploading your audio file...';
+                const uploadResponse = await fetch(uploadUrl, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/octet-stream' },
                     body: inputFile,
+                    headers: { 'Content-Type': 'application/octet-stream' }
                 });
+                if (!uploadResponse.ok) throw new Error('File upload failed.');
 
-                if (!uploadResponse.ok) {
-                    const errorText = await uploadResponse.text();
-                    throw new Error(`Upload failed: ${errorText}`);
-                }
-                const { jobId } = await uploadResponse.json();
-
-                // Step 2: Send metadata to the background function
+                processingStatus.textContent = 'Starting the album creation process...';
                 const metadata = {
                     jobId,
                     albumTitle: document.getElementById('album-title').value,
@@ -236,18 +239,16 @@
                     body: JSON.stringify(metadata),
                 });
 
-                if (!processResponse.ok) {
-                    const errorText = await processResponse.text();
-                    throw new Error(`Failed to start processing: ${errorText}`);
-                }
+                if (!processResponse.ok) throw new Error('Failed to start processing.');
 
-                // Step 3: Start polling for the result
+                processingHeader.textContent = 'Processing Your Album';
+                processingStatus.textContent = 'Your album is being created in the background. This may take a few minutes...';
                 pollForStatus(jobId);
 
             } catch (error) {
                 console.error('Submission error:', error);
                 processingHeader.textContent = 'An Error Occurred';
-                document.getElementById('processing-status').textContent = error.message;
+                processingStatus.textContent = error.message;
             }
         }
         
