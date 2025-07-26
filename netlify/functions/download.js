@@ -1,9 +1,9 @@
 // netlify/functions/download.js
-const { getStore: getStoreDownload } = require('@netlify/blobs');
+import { getStore } from '@netlify/blobs';
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
     const jobId = event.queryStringParameters.id;
-    const store = getStoreDownload('audio_uploads');
+    const store = getStore('audio_uploads');
 
     try {
         const zipData = await store.get(`${jobId}-result`, { type: 'buffer' });
