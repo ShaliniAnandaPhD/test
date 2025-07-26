@@ -1,4 +1,4 @@
-const { Busboy } = require('@busboy/body-parser');
+const Busboy = require('busboy');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -13,19 +13,20 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
 function parseMultipartForm(event) {
     return new Promise((resolve, reject) => {
         const busboy = Busboy({
-            headers: { 'content-type': event.headers['content-type'] }
+            headers: { 'content-type': event.headers['content-type'] || event.headers['Content-Type'] }
         });
         const fields = {};
         const uploads = {};
 
-        busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-            const saveTo = path.join(os.tmpdir(), `upload_${Date.now()}_${filename.filename}`);
+        busboy.on('file', (fieldname, file, { filename, encoding, mimeType }) => {
+            const saveTo = path.join(os.tmpdir(), `upload_${Date.now()}_${filename}`);
             const writeStream = fs.createWriteStream(saveTo);
             file.pipe(writeStream);
 
             writeStream.on('finish', () => {
-                uploads[fieldname] = { filepath: saveTo, filename: filename.filename };
+                uploads[fieldname] = { filepath: saveTo, filename: filename };
             });
+             writeStream.on('error', reject);
         });
 
         busboy.on('field', (fieldname, val) => {
@@ -36,9 +37,7 @@ function parseMultipartForm(event) {
             resolve({ fields, uploads });
         });
         
-        busboy.on('error', err => {
-            reject(err);
-        });
+        busboy.on('error', reject);
 
         busboy.end(Buffer.from(event.body, 'base64'));
     });
@@ -71,8 +70,8 @@ exports.handler = async (event) => {
         const experiences = JSON.parse(fields.experiences);
         const uploadedFile = uploads.audio;
 
-        if (!uploadedFile) {
-            throw new Error('No audio file uploaded.');
+        if (!uploadedFile || !uploadedFile.filepath) {
+            throw new Error('No audio file uploaded or file failed to save.');
         }
         tempFiles.push(uploadedFile.filepath);
 
@@ -90,7 +89,7 @@ exports.handler = async (event) => {
                 }
             }
             const themeData = memoryThemes[selectedThemeKey];
-            const outputFilePath = path.join(os.tmpdir(), `output_${i}.mp3`);
+            const outputFilePath = path.join(os.tmpdir(), `output_${Date.now()}_${i}.mp3`);
             tempFiles.push(outputFilePath);
 
             await new Promise((resolve, reject) => {
@@ -99,7 +98,7 @@ exports.handler = async (event) => {
                     .audioCodec('libmp3lame')
                     .audioBitrate('192k')
                     .toFormat('mp3')
-                    .on('error', (err) => reject(err))
+                    .on('error', (err) => reject(new Error(`FFmpeg error: ${err.message}`)))
                     .on('end', () => resolve())
                     .save(outputFilePath);
             });
@@ -129,6 +128,15 @@ exports.handler = async (event) => {
         };
     } finally {
         // Cleanup temporary files
-        tempFiles.forEach(file => fs.unlinkSync(file));
+        tempFiles.forEach(file => {
+            try {
+                if (fs.existsSync(file)) {
+                    fs.unlinkSync(file);
+                }
+            } catch (err) {
+                console.error(`Failed to delete temp file: ${file}`, err);
+            }
+        });
     }
 };
+
