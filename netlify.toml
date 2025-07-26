@@ -4,13 +4,16 @@
   command = "npm install"
   # The directory where your website's files are.
   publish = "/"
+  
+  # Set environment variables for the build
+  [build.environment]
+    # Use Node.js 18 for compatibility with dependencies
+    NODE_VERSION = "18"
 
 # Configuration for Netlify Functions
 [functions]
   directory = "netlify/functions/"
-  # Use Node.js 18 for compatibility
   node_bundler = "esbuild"
-  node_version = "18"
 
 # Enable Netlify Blob Storage
 [stores]
@@ -20,3 +23,4 @@
 # Configure the background function to run longer
 [functions."process-audio-background"]
   schedule = "@asap" # This makes it a background function
+
