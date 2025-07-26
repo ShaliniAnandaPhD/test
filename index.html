@@ -182,7 +182,7 @@
             pollInterval = setInterval(async () => {
                 try {
                     const response = await fetch(`/.netlify/functions/status?id=${jobId}`);
-                    if (!response.ok) return; // Silently ignore errors, just keep polling
+                    if (!response.ok) return;
                     const data = await response.json();
 
                     if (data.status === 'completed') {
@@ -197,42 +197,55 @@
                         processingHeader.textContent = 'An Error Occurred';
                         document.getElementById('processing-status').textContent = data.error || 'Processing failed. Please try again.';
                     }
-                    // If status is 'pending', do nothing and wait for the next poll.
                 } catch (error) {
                     console.error('Polling error:', error);
-                    // Stop polling on network error to avoid spamming
                     clearInterval(pollInterval);
                 }
-            }, 5000); // Check every 5 seconds
+            }, 5000);
         }
 
         async function handleSubmit() {
             inputPanel.classList.add('hidden');
             processingPanel.classList.remove('hidden');
 
-            const formData = new FormData();
-            formData.append('audio', inputFile);
-            formData.append('albumTitle', document.getElementById('album-title').value);
-            formData.append('recipientName', document.getElementById('recipient-name').value);
-            const experiences = Array.from(document.querySelectorAll('.experience-input')).map(input => input.value.trim()).filter(Boolean);
-            formData.append('experiences', JSON.stringify(experiences));
-
             try {
-                const response = await fetch('/.netlify/functions/upload', {
-                    method: 'POST',
-                    body: formData,
+                // Step 1: Upload the audio file directly
+                const uploadResponse = await fetch('/.netlify/functions/upload-audio', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: inputFile,
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
                     throw new Error(`Upload failed: ${errorText}`);
                 }
+                const { jobId } = await uploadResponse.json();
 
-                const { jobId } = await response.json();
+                // Step 2: Send metadata to the background function
+                const metadata = {
+                    jobId,
+                    albumTitle: document.getElementById('album-title').value,
+                    recipientName: document.getElementById('recipient-name').value,
+                    experiences: Array.from(document.querySelectorAll('.experience-input')).map(input => input.value.trim()).filter(Boolean),
+                };
+
+                const processResponse = await fetch('/.netlify/functions/process-audio-background', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(metadata),
+                });
+
+                if (!processResponse.ok) {
+                    const errorText = await processResponse.text();
+                    throw new Error(`Failed to start processing: ${errorText}`);
+                }
+
+                // Step 3: Start polling for the result
                 pollForStatus(jobId);
 
             } catch (error) {
-                console.error('Upload error:', error);
+                console.error('Submission error:', error);
                 processingHeader.textContent = 'An Error Occurred';
                 document.getElementById('processing-status').textContent = error.message;
             }
@@ -267,6 +280,5 @@
     </script>
 </body>
 </html>
-
 
 
