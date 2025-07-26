@@ -1,25 +1,46 @@
 # This is the main configuration file for your site.
+# It tells Netlify how to build and deploy your project.
+
 [build]
-  # This command is run when you deploy the site.
+  # This command is run when you deploy the site. It installs the
+  # dependencies listed in your package.json file.
   command = "npm install"
-  # The directory where your website's files are.
+
+  # The directory that contains the deploy-ready assets of your site.
+  # Since index.html is in the root, we use "/".
   publish = "/"
-  
-  # Set environment variables for the build
+
+  # Set environment variables for the build process.
   [build.environment]
-    # Use Node.js 18 for compatibility with dependencies
+    # We specify Node.js version 18 to ensure compatibility with all
+    # of the project's dependencies.
     NODE_VERSION = "18"
 
-# Configuration for ALL Netlify Functions
+# This section configures all Netlify Functions in the project.
+# The wildcard "*" applies these settings to every function.
 [functions."*"]
+  # Specifies "esbuild" as the bundler for Node.js functions, which is
+  # fast and efficient.
   node_bundler = "esbuild"
-  # FIX: Mark @netlify/blobs as an external module that shouldn't be bundled.
+
+  # CRITICAL FIX: This line tells the bundler NOT to include the
+  # "@netlify/blobs" library in the function's code bundle.
+  # The function will instead use the native version of the library
+  # that is already available in the Netlify runtime environment.
+  # This is essential for the blob storage feature to work correctly.
   external_node_modules = ["@netlify/blobs"]
 
-# Enable Netlify Blob Storage
+# This section enables and configures Netlify Blob Storage.
 [stores]
-  # Name of the blob store we will use
+  # We are creating a blob store named "audio_uploads".
+  # The string "Audio Uploads" is a user-friendly description
+  # that will appear in the Netlify UI.
   audio_uploads = "Audio Uploads"
+
+# NOTE: The background function (process-audio-background.js) is
+# automatically detected by Netlify because its filename ends in
+# "-background.js", so no extra configuration is needed here for it.
+
 
 # NOTE: The background function is automatically detected by its filename
 # ending in "-background.js", so no extra configuration is needed here.
