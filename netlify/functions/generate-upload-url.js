@@ -1,8 +1,8 @@
 // netlify/functions/generate-upload-url.js
-import { getStore } from '@netlify/blobs';
-import { v4 as uuidv4 } from 'uuid';
+const { getStore } = require('@netlify/blobs');
+const { v4: uuidv4 } = require('uuid');
 
-export const handler = async (event) => {
+exports.handler = async (event) => {
     if (event.httpMethod !== 'GET') {
         return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
     }
