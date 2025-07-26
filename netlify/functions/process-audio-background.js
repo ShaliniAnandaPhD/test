@@ -1,14 +1,16 @@
 // netlify/functions/process-audio-background.js
-const { getStore } = require('@netlify/blobs');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegStatic = require('ffmpeg-static');
-const JSZip = require('jszip');
+import { getStore } from '@netlify/blobs';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+import JSZip from 'jszip';
 
+// Set the path for the ffmpeg binary.
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
+// Defines various audio themes with corresponding ffmpeg filters.
 const memoryThemes = {
     childhood: { name: 'Childhood Memory', filters: 'asetrate=44100*1.2,aresample=44100,highpass=f=300,aecho=0.8:0.88:60:0.4,chorus=0.5:0.9:50:0.4:0.25:2' },
     love: { name: 'First Love', filters: 'aphaser=type=t:speed=0.5:decay=0.4,chorus=0.6:0.9:50:0.3:0.25:1.5,equalizer=f=2000:t=h:w=2000:g=3' },
@@ -21,15 +23,17 @@ const memoryThemes = {
     default: { name: 'Magical Remix', filters: 'chorus=0.7:0.9:55:0.4:0.25:2.5,aecho=0.8:0.88:60:0.4' }
 };
 
-exports.handler = async (event) => {
+export default async (event, context) => {
     const metadata = JSON.parse(event.body);
     const { jobId, experiences, albumTitle, recipientName } = metadata;
     const store = getStore('audio_uploads');
     let tempFiles = [];
 
     try {
+        // Set initial status for the job.
         await store.setJSON(`${jobId}-metadata`, { ...metadata, status: 'pending' });
         
+        // Download the original audio file to a temporary location.
         const originalFilePath = path.join(os.tmpdir(), `original_${jobId}`);
         tempFiles.push(originalFilePath);
         
@@ -45,9 +49,11 @@ exports.handler = async (event) => {
         zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}`);
         zip.file('01_original.mp3', fs.createReadStream(originalFilePath));
         
+        // Process the audio for each experience.
         for (let i = 0; i < experiences.length; i++) {
             const experienceText = experiences[i];
             let themeKey = 'default';
+            // Find a theme that matches the experience description.
             for (const key in memoryThemes) {
                 if (experienceText.toLowerCase().includes(key)) {
                     themeKey = key;
@@ -58,6 +64,7 @@ exports.handler = async (event) => {
             const outputFilePath = path.join(os.tmpdir(), `output_${jobId}_${i}.mp3`);
             tempFiles.push(outputFilePath);
 
+            // Apply ffmpeg filters to create the themed audio track.
             await new Promise((resolve, reject) => {
                 ffmpeg(originalFilePath)
                     .audioFilter(theme.filters)
@@ -71,15 +78,19 @@ exports.handler = async (event) => {
             zip.file(`${String(i + 2).padStart(2, '0')}_${themeKey}_remix.mp3`, fs.createReadStream(outputFilePath));
         }
 
+        // Generate the zip file and store it.
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', streamFiles: true });
         await store.set(`${jobId}-result`, zipBuffer);
         
+        // Update the job status to 'completed'.
         await store.setJSON(`${jobId}-metadata`, { ...metadata, status: 'completed' });
         
     } catch (error) {
         console.error('Background Processing Error:', error);
+        // If an error occurs, update the status to 'failed'.
         await store.setJSON(`${jobId}-metadata`, { ...metadata, status: 'failed', error: error.message });
     } finally {
+        // Clean up temporary files.
         tempFiles.forEach(file => fs.existsSync(file) && fs.unlinkSync(file));
     }
 };
