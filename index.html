@@ -55,15 +55,12 @@
             transform: none;
             box-shadow: none;
         }
-        .progress-bar-inner {
-            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-            transition: width 0.5s ease-in-out;
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+        .vinyl-spin {
+            animation: spin 3s linear infinite;
         }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -113,11 +110,8 @@
             <section id="processing-panel" class="glass-panel p-6 sm:p-8 text-center hidden">
                  <div class="mb-6">
                     <div class="vinyl-spin text-6xl mb-4">💿</div>
-                    <h2 id="processing-header" class="font-orbitron text-2xl font-bold text-white mb-2">Uploading & Processing...</h2>
-                    <p id="processing-status" class="text-purple-300">This may take a moment...</p>
-                </div>
-                <div class="w-full bg-gray-700 rounded-full h-4">
-                    <div id="progress-bar" class="progress-bar-inner h-4 rounded-full" style="width: 0%"></div>
+                    <h2 id="processing-header" class="font-orbitron text-2xl font-bold text-white mb-2">Processing Your Album</h2>
+                    <p id="processing-status" class="text-purple-300">Your album is being created in the background. This may take a few minutes...</p>
                 </div>
             </section>
 
@@ -145,10 +139,10 @@
         const downloadButton = document.getElementById('download-button');
         const resultMessage = document.getElementById('result-message');
         const createAnotherButton = document.getElementById('create-another');
-        const progressBar = document.getElementById('progress-bar');
         const processingHeader = document.getElementById('processing-header');
         
         let inputFile = null;
+        let pollInterval = null;
 
         function updateCreateButton() {
             const hasFile = inputFile !== null;
@@ -183,6 +177,34 @@
             group.appendChild(removeBtn);
             experienceInputsContainer.appendChild(group);
         }
+        
+        function pollForStatus(jobId) {
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/.netlify/functions/status?id=${jobId}`);
+                    if (!response.ok) return; // Silently ignore errors, just keep polling
+                    const data = await response.json();
+
+                    if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        downloadButton.href = `/.netlify/functions/download?id=${jobId}`;
+                        downloadButton.download = data.filename;
+                        resultMessage.textContent = `Your album "${data.albumTitle}" is ready to download.`;
+                        processingPanel.classList.add('hidden');
+                        resultsPanel.classList.remove('hidden');
+                    } else if (data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        processingHeader.textContent = 'An Error Occurred';
+                        document.getElementById('processing-status').textContent = data.error || 'Processing failed. Please try again.';
+                    }
+                    // If status is 'pending', do nothing and wait for the next poll.
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    // Stop polling on network error to avoid spamming
+                    clearInterval(pollInterval);
+                }
+            }, 5000); // Check every 5 seconds
+        }
 
         async function handleSubmit() {
             inputPanel.classList.add('hidden');
@@ -196,47 +218,28 @@
             formData.append('experiences', JSON.stringify(experiences));
 
             try {
-                const response = await fetch('/.netlify/functions/process-audio', {
+                const response = await fetch('/.netlify/functions/upload', {
                     method: 'POST',
                     body: formData,
                 });
 
                 if (!response.ok) {
-                    // FIX: Read the response body ONCE as text.
                     const errorText = await response.text();
-                    let errorMessage = errorText;
-                    // Then, TRY to parse it as JSON.
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.error || 'Unknown server error.';
-                    } catch (e) {
-                        // If parsing fails, it's not JSON. The raw text is the error.
-                        // No action needed, errorMessage is already set to the raw text.
-                    }
-                    throw new Error(errorMessage);
+                    throw new Error(`Upload failed: ${errorText}`);
                 }
 
-                const result = await response.json();
-                
-                const blob = new Blob([Uint8Array.from(atob(result.zip), c => c.charCodeAt(0))], { type: 'application/zip' });
-                const url = URL.createObjectURL(blob);
-
-                downloadButton.href = url;
-                downloadButton.download = result.filename;
-                resultMessage.textContent = `Your album "${result.albumTitle}" is ready to download.`;
-                
-                processingPanel.classList.add('hidden');
-                resultsPanel.classList.remove('hidden');
+                const { jobId } = await response.json();
+                pollForStatus(jobId);
 
             } catch (error) {
-                console.error('Processing error:', error);
+                console.error('Upload error:', error);
                 processingHeader.textContent = 'An Error Occurred';
                 document.getElementById('processing-status').textContent = error.message;
-                progressBar.parentElement.classList.add('hidden');
             }
         }
         
         function resetUI() {
+            if (pollInterval) clearInterval(pollInterval);
             inputPanel.classList.remove('hidden');
             processingPanel.classList.add('hidden');
             resultsPanel.classList.add('hidden');
@@ -264,5 +267,6 @@
     </script>
 </body>
 </html>
+
 
 
