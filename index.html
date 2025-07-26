@@ -202,14 +202,16 @@
                 });
 
                 if (!response.ok) {
-                    let errorMessage = 'A server error occurred.';
-                    // Gracefully handle non-JSON error responses (like timeouts)
+                    // FIX: Read the response body ONCE as text.
+                    const errorText = await response.text();
+                    let errorMessage = errorText;
+                    // Then, TRY to parse it as JSON.
                     try {
-                        const errorData = await response.json();
+                        const errorData = JSON.parse(errorText);
                         errorMessage = errorData.error || 'Unknown server error.';
                     } catch (e) {
-                        const errorText = await response.text();
-                        errorMessage = `The server returned an error: ${errorText}`;
+                        // If parsing fails, it's not JSON. The raw text is the error.
+                        // No action needed, errorMessage is already set to the raw text.
                     }
                     throw new Error(errorMessage);
                 }
@@ -262,4 +264,5 @@
     </script>
 </body>
 </html>
+
 
