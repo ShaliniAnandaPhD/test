@@ -10,18 +10,15 @@
     # Use Node.js 18 for compatibility with dependencies
     NODE_VERSION = "18"
 
-# Explicitly define the functions directory.
+# Define the functions directory and apply settings directly.
+# This is a cleaner and more direct approach than using a wildcard.
 [functions]
   directory = "netlify/functions"
-
-# Configuration for ALL Netlify Functions.
-[functions."*"]
-  # Use the 'zisi' bundler instead of 'esbuild'. This can resolve
-  # environment linking issues.
-  node_bundler = "zisi"
+  node_bundler = "esbuild"
   
-  # This line remains critical. It tells the bundler to use the native
-  # version of the blobs library from the Netlify runtime.
+  # This line remains the most critical part. It tells the bundler to use 
+  # the native version of the blobs library from the Netlify runtime,
+  # which is already authenticated.
   external_node_modules = ["@netlify/blobs"]
 
 # Enable Netlify Blob Storage
