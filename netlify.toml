@@ -1,27 +1,22 @@
 # This is the main configuration file for your site.
 [build]
-  # This command is run when you deploy the site.
   command = "npm install"
-  # The directory where your website's files are.
   publish = "/"
   
-  # Set environment variables for the build
   [build.environment]
-    # Use Node.js 18 for compatibility with dependencies
     NODE_VERSION = "18"
 
 # Define the functions directory and apply settings directly.
-# This is a cleaner and more direct approach than using a wildcard.
 [functions]
   directory = "netlify/functions"
-  node_bundler = "esbuild"
+  # Switch to the 'nft' (Node File Tracing) bundler.
+  node_bundler = "nft"
   
-  # This line remains the most critical part. It tells the bundler to use 
-  # the native version of the blobs library from the Netlify runtime,
-  # which is already authenticated.
+  # This line remains critical. It tells the bundler to use the native
+  # version of the blobs library from the Netlify runtime.
   external_node_modules = ["@netlify/blobs"]
 
 # Enable Netlify Blob Storage
 [stores]
-  # Name of the blob store we will use
   audio_uploads = "Audio Uploads"
+
