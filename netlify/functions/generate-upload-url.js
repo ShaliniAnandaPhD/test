@@ -1,11 +1,12 @@
 // netlify/functions/generate-upload-url.js
-const { getStore } = require('@netlify/blobs');
-const { v4: uuidv4 } = require('uuid');
 
-exports.handler = async (event) => {
-    // --- Defensive Check 1: Ensure we are handling a GET request ---
-    // This is the first line of defense. If the request is not GET,
-    // we stop immediately.
+// Using modern ES Module 'import' syntax instead of 'require'.
+// This can resolve conflicts in the Netlify build environment.
+import { getStore } from '@netlify/blobs';
+import { v4 as uuidv4 } from 'uuid';
+
+export const handler = async (event) => {
+    // This function only accepts GET requests.
     if (event.httpMethod !== 'GET') {
         return {
             statusCode: 405, // Method Not Allowed
@@ -14,46 +15,35 @@ exports.handler = async (event) => {
     }
 
     try {
-        // --- Step 1: Generate a unique ID for the job ---
-        // This ID will be used as the filename in blob storage and to track the job status.
+        // Generate a unique ID for the job.
         const jobId = uuidv4();
 
-        // --- Step 2: Connect to the correct blob store ---
-        // 'audio_uploads' must match the store name defined in your netlify.toml file.
+        // Connect to the 'audio_uploads' blob store.
         const store = getStore('audio_uploads');
         
-        // --- Step 3: Generate a secure, temporary URL for the upload ---
-        // This "signed URL" gives the browser permission to upload a file directly
-        // to blob storage without needing server credentials.
-        // We set it to expire in 900 seconds (15 minutes).
-        const { url: uploadUrl } = await store.getSignedURL(jobId, { expiresIn: 900 });
+        // Generate a secure, temporary URL for the client to upload the file.
+        // It's valid for 15 minutes (900 seconds).
+        const { url } = await store.getSignedURL(jobId, { expiresIn: 900 });
 
-        // --- Success Case: Return the URL and Job ID to the browser ---
+        // Return the secure URL and the job ID to the browser.
         return {
             statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                uploadUrl: uploadUrl,
+                uploadUrl: url,
                 jobId: jobId
             }),
         };
-
     } catch (error) {
-        // --- Error Handling: Catch any errors during the process ---
-
-        // Log the *entire* error object to the Netlify function logs.
-        // This is more detailed than just error.message and can help debug
-        // complex environment-specific issues.
-        console.error('FATAL URL Generation Error:', error);
-
+        // Log the full error to the function logs for debugging.
+        console.error('URL Generation Error:', error);
+        
         // Return a detailed error message to the browser.
-        return {
-            statusCode: 500,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ 
                 error: 'Failed to generate a secure upload link.',
-                details: error.message // Provide the specific error message for context.
-            }),
+                details: error.message 
+            }) 
         };
     }
 };
