@@ -4,7 +4,7 @@
   publish = "/"
   
   [build.environment]
-    NODE_VERSION = "18"
+    NODE_VERSION = "20"
 
 # Define the functions directory and apply settings directly.
 [functions]
@@ -19,4 +19,3 @@
 # Enable Netlify Blob Storage
 [stores]
   audio_uploads = "Audio Uploads"
-
