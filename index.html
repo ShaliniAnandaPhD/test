@@ -62,6 +62,10 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        .error-panel {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
     </style>
 </head>
 <body class="p-4 sm:p-8">
@@ -81,6 +85,7 @@
                         <input type="file" id="audio-file-input" class="hidden" accept="audio/*">
                         <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
                         <p id="file-label" class="text-gray-400">Drop your audio file here, or click to browse</p>
+                        <p class="text-xs text-gray-500 mt-2">Supported formats: MP3, WAV, M4A (Max 50MB)</p>
                     </div>
                 </div>
                 <div>
@@ -88,11 +93,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">Album Title</label>
-                            <input type="text" id="album-title" class="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500" placeholder="e.g., Summer of '24">
+                            <input type="text" id="album-title" class="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500" placeholder="e.g., Summer of '24" maxlength="50">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">Recipient Name</label>
-                            <input type="text" id="recipient-name" class="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500" placeholder="e.g., For Alex">
+                            <input type="text" id="recipient-name" class="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500" placeholder="e.g., For Alex" maxlength="50">
                         </div>
                     </div>
                 </div>
@@ -101,7 +106,7 @@
                     <div id="experience-inputs" class="space-y-3"></div>
                     <button id="add-experience" class="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mt-3">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add another experience
+                        Add another experience (max 5)
                     </button>
                 </div>
                 <button id="create-album-button" class="w-full btn-primary text-white font-bold py-4 px-6 rounded-lg text-lg" disabled>Create Memory Album</button>
@@ -109,17 +114,35 @@
 
             <section id="processing-panel" class="glass-panel p-6 sm:p-8 text-center hidden">
                  <div class="mb-6">
-                    <div class="vinyl-spin text-6xl mb-4">(O)</div>
+                    <div class="vinyl-spin text-6xl mb-4">💿</div>
                     <h2 id="processing-header" class="font-orbitron text-2xl font-bold text-white mb-2">Processing Your Album</h2>
                     <p id="processing-status" class="text-purple-300">Your album is being created in the background. This may take a few minutes...</p>
+                    <div class="mt-4">
+                        <div class="bg-gray-700 rounded-full h-2 w-full">
+                            <div id="progress-bar" class="bg-purple-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="progress-text" class="text-sm text-gray-400 mt-2">Starting...</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="error-panel" class="error-panel glass-panel p-6 sm:p-8 text-center hidden">
+                <h2 class="font-orbitron text-2xl font-bold text-red-400 mb-4">❌ Something Went Wrong</h2>
+                <p id="error-message" class="text-red-300 mb-4"></p>
+                <div class="space-x-4">
+                    <button id="retry-button" class="btn-primary text-white font-bold py-3 px-6 rounded-lg">Try Again</button>
+                    <button id="reset-button" class="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition">Start Over</button>
                 </div>
             </section>
 
             <section id="results-panel" class="glass-panel p-6 sm:p-8 text-center hidden">
-                <h2 class="font-orbitron text-3xl font-bold text-white mb-6">Success! Your Album is Ready!</h2>
+                <h2 class="font-orbitron text-3xl font-bold text-white mb-6">🎉 Success! Your Album is Ready!</h2>
                 <p id="result-message" class="text-lg text-gray-300 mb-6"></p>
-                <a id="download-button" href="#" class="inline-block btn-primary text-white font-bold py-4 px-8 rounded-lg text-lg">Download Album (ZIP)</a>
-                 <button id="create-another" class="mt-4 w-full md:w-auto md:inline-block bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition">Create Another</button>
+                <div class="space-y-4">
+                    <a id="download-button" href="#" class="inline-block btn-primary text-white font-bold py-4 px-8 rounded-lg text-lg">📥 Download Album (ZIP)</a>
+                    <br>
+                    <button id="create-another" class="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition">Create Another Album</button>
+                </div>
             </section>
         </main>
     </div>
@@ -128,6 +151,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const inputPanel = document.getElementById('input-panel');
         const processingPanel = document.getElementById('processing-panel');
+        const errorPanel = document.getElementById('error-panel');
         const resultsPanel = document.getElementById('results-panel');
         const audioFileInput = document.getElementById('audio-file-input');
         const fileDropZone = document.getElementById('file-drop-zone');
@@ -141,9 +165,20 @@
         const createAnotherButton = document.getElementById('create-another');
         const processingHeader = document.getElementById('processing-header');
         const processingStatus = document.getElementById('processing-status');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const errorMessage = document.getElementById('error-message');
+        const retryButton = document.getElementById('retry-button');
+        const resetButton = document.getElementById('reset-button');
         
         let inputFile = null;
         let pollInterval = null;
+        let currentJobId = null;
+        let pollCount = 0;
+        const MAX_POLL_ATTEMPTS = 120; // 10 minutes with 5-second intervals
+
+        // File size limit (50MB)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
         function updateCreateButton() {
             const hasFile = inputFile !== null;
@@ -152,94 +187,198 @@
             createAlbumButton.disabled = !(hasFile && hasTitle && hasExperiences);
         }
 
+        function validateFile(file) {
+            if (!file) return { valid: false, error: 'No file selected' };
+            
+            if (!file.type.startsWith('audio/')) {
+                return { valid: false, error: 'Please select an audio file' };
+            }
+            
+            if (file.size > MAX_FILE_SIZE) {
+                return { valid: false, error: 'File is too large. Maximum size is 50MB' };
+            }
+            
+            if (file.size === 0) {
+                return { valid: false, error: 'File appears to be empty' };
+            }
+            
+            return { valid: true };
+        }
+
         function handleFileSelect(file) {
-            if (!file || !file.type.startsWith('audio/')) return;
+            const validation = validateFile(file);
+            
+            if (!validation.valid) {
+                showError(validation.error);
+                inputFile = null;
+                fileLabel.textContent = 'Drop your audio file here, or click to browse';
+                updateCreateButton();
+                return;
+            }
+            
             inputFile = file;
-            fileLabel.textContent = `File: ${file.name}`;
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            fileLabel.textContent = `File: ${file.name} (${sizeMB}MB)`;
             updateCreateButton();
         }
 
         function createExperienceInput(placeholder = '') {
+            const currentInputs = document.querySelectorAll('.experience-input').length;
+            if (currentInputs >= 5) {
+                addExperienceButton.style.display = 'none';
+                return;
+            }
+            
             const group = document.createElement('div');
             group.className = 'flex gap-2 items-center';
+            
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'experience-input flex-1 bg-gray-900/50 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500';
-            input.placeholder = placeholder || 'Describe a memory or feeling';
+            input.placeholder = placeholder || 'Describe a memory or feeling (e.g., "childhood summer adventures")';
+            input.maxLength = 100;
             input.addEventListener('input', updateCreateButton);
+            
             const removeBtn = document.createElement('button');
-            removeBtn.className = 'remove-experience text-gray-400 hover:text-red-400';
+            removeBtn.className = 'remove-experience text-gray-400 hover:text-red-400 transition';
             removeBtn.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
             removeBtn.onclick = () => {
                 group.remove();
                 updateCreateButton();
+                addExperienceButton.style.display = 'flex';
             };
+            
             group.appendChild(input);
             group.appendChild(removeBtn);
             experienceInputsContainer.appendChild(group);
+            
+            if (document.querySelectorAll('.experience-input').length >= 5) {
+                addExperienceButton.style.display = 'none';
+            }
+        }
+        
+        function showError(message) {
+            hideAllPanels();
+            errorMessage.textContent = message;
+            errorPanel.classList.remove('hidden');
+        }
+        
+        function hideAllPanels() {
+            inputPanel.classList.add('hidden');
+            processingPanel.classList.add('hidden');
+            errorPanel.classList.add('hidden');
+            resultsPanel.classList.add('hidden');
+        }
+        
+        function updateProgress(percentage, status) {
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = status;
         }
         
         function pollForStatus(jobId) {
+            pollCount = 0;
+            updateProgress(10, 'Processing started...');
+            
             pollInterval = setInterval(async () => {
+                pollCount++;
+                
+                // Update progress based on time elapsed
+                const progressPercentage = Math.min(10 + (pollCount * 2), 90);
+                
                 try {
                     const response = await fetch(`/.netlify/functions/status?id=${jobId}`);
-                    if (!response.ok) return;
+                    
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            updateProgress(progressPercentage, 'Job not found, still processing...');
+                            return;
+                        }
+                        throw new Error(`Status check failed: ${response.status}`);
+                    }
+                    
                     const data = await response.json();
+                    console.log('Status update:', data);
 
                     if (data.status === 'completed') {
                         clearInterval(pollInterval);
+                        updateProgress(100, 'Complete!');
+                        
                         downloadButton.href = `/.netlify/functions/download?id=${jobId}`;
-                        downloadButton.download = data.filename;
-                        resultMessage.textContent = `Your album "${data.albumTitle}" is ready to download.`;
-                        processingPanel.classList.add('hidden');
-                        resultsPanel.classList.remove('hidden');
+                        downloadButton.download = data.filename || 'memory-album.zip';
+                        resultMessage.textContent = `Your album "${data.albumTitle}" is ready to download!`;
+                        
+                        setTimeout(() => {
+                            hideAllPanels();
+                            resultsPanel.classList.remove('hidden');
+                        }, 1000);
+                        
                     } else if (data.status === 'failed') {
                         clearInterval(pollInterval);
-                        processingHeader.textContent = 'An Error Occurred';
-                        processingStatus.textContent = data.error || 'Processing failed. Please try again.';
+                        const errorMsg = data.error || 'Processing failed for unknown reason';
+                        showError(`Processing failed: ${errorMsg}`);
+                        
+                    } else if (data.status === 'pending') {
+                        updateProgress(progressPercentage, 'Processing your audio experiences...');
                     }
+                    
                 } catch (error) {
                     console.error('Polling error:', error);
-                    clearInterval(pollInterval);
+                    
+                    if (pollCount >= MAX_POLL_ATTEMPTS) {
+                        clearInterval(pollInterval);
+                        showError('Processing is taking longer than expected. Please try again later.');
+                    } else {
+                        updateProgress(progressPercentage, 'Checking status...');
+                    }
                 }
             }, 5000);
         }
 
         async function handleSubmit() {
-            inputPanel.classList.add('hidden');
+            hideAllPanels();
             processingPanel.classList.remove('hidden');
             
             try {
                 // Step 1: Generate a unique job ID on the client side.
-                const jobId = crypto.randomUUID();
+                currentJobId = crypto.randomUUID();
+                console.log('Generated job ID:', currentJobId);
 
+                updateProgress(5, 'Uploading audio file...');
                 processingHeader.textContent = 'Uploading...';
-                processingStatus.textContent = 'Uploading your audio file directly.';
+                processingStatus.textContent = 'Uploading your audio file securely.';
 
-                // Step 2: Upload the file directly to our new upload function.
+                // Step 2: Upload the file directly to our upload function.
                 const uploadResponse = await fetch('/.netlify/functions/upload', {
                     method: 'POST',
                     headers: {
-                        'x-job-id': jobId // Pass the jobId in a custom header
+                        'x-job-id': currentJobId
                     },
                     body: inputFile
                 });
 
                 if (!uploadResponse.ok) {
-                    const err = new Error('Server returned an error during file upload.');
-                    err.response = uploadResponse;
-                    throw err;
+                    const errorText = await uploadResponse.text();
+                    throw new Error(`Upload failed (${uploadResponse.status}): ${errorText}`);
                 }
 
-                processingStatus.textContent = 'Starting the album creation process...';
+                const uploadResult = await uploadResponse.json();
+                console.log('Upload result:', uploadResult);
+
+                updateProgress(15, 'Starting audio processing...');
+                processingHeader.textContent = 'Processing Your Album';
+                processingStatus.textContent = 'Creating your personalized audio experiences...';
                 
-                // Step 3: Kick off the background processing job with the same jobId.
+                // Step 3: Start the background processing job.
                 const metadata = {
-                    jobId,
-                    albumTitle: document.getElementById('album-title').value,
-                    recipientName: document.getElementById('recipient-name').value,
-                    experiences: Array.from(document.querySelectorAll('.experience-input')).map(input => input.value.trim()).filter(Boolean),
+                    jobId: currentJobId,
+                    albumTitle: albumTitle.value.trim(),
+                    recipientName: document.getElementById('recipient-name').value.trim() || 'Music Lover',
+                    experiences: Array.from(document.querySelectorAll('.experience-input'))
+                        .map(input => input.value.trim())
+                        .filter(Boolean)
                 };
+
+                console.log('Sending metadata:', metadata);
 
                 const processResponse = await fetch('/.netlify/functions/process-audio-background', {
                     method: 'POST',
@@ -248,58 +387,102 @@
                 });
 
                 if (!processResponse.ok) {
-                    const err = new Error('Server returned an error while starting the process.');
-                    err.response = processResponse;
-                    throw err;
+                    const errorText = await processResponse.text();
+                    throw new Error(`Processing failed to start (${processResponse.status}): ${errorText}`);
                 }
 
-                processingHeader.textContent = 'Processing Your Album';
-                processingStatus.textContent = 'Your album is being created in the background. This may take a few minutes...';
-                pollForStatus(jobId);
+                const processResult = await processResponse.json();
+                console.log('Process result:', processResult);
+
+                // Step 4: Start polling for status
+                pollForStatus(currentJobId);
 
             } catch (error) {
                 console.error('Submission error:', error);
-                processingHeader.textContent = 'An Error Occurred';
-
-                if (error && error.response) {
-                    const serverErrorBody = await error.response.text();
-                    processingStatus.textContent = `Error from server (${error.response.status}): ${serverErrorBody || error.message}`;
-                } else if (error) {
-                    processingStatus.textContent = `Could not prepare upload. Details: ${error.message}`;
-                } else {
-                    processingStatus.textContent = 'An unknown error occurred during the submission process.';
-                }
+                showError(`Failed to start processing: ${error.message}`);
             }
         }
         
         function resetUI() {
-            if (pollInterval) clearInterval(pollInterval);
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            
+            currentJobId = null;
+            pollCount = 0;
+            
+            hideAllPanels();
             inputPanel.classList.remove('hidden');
-            processingPanel.classList.add('hidden');
-            resultsPanel.classList.add('hidden');
+            
             inputFile = null;
             audioFileInput.value = '';
             fileLabel.textContent = 'Drop your audio file here, or click to browse';
             albumTitle.value = '';
             document.getElementById('recipient-name').value = '';
+            
             experienceInputsContainer.innerHTML = '';
             createExperienceInput('e.g., Summer nights at the beach');
             createExperienceInput('e.g., First day of school');
+            addExperienceButton.style.display = 'flex';
+            
             updateCreateButton();
         }
+
+        // Drag and drop functionality
+        fileDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.add('border-purple-500', 'bg-purple-500/10');
+        });
+        
+        fileDropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.remove('border-purple-500', 'bg-purple-500/10');
+        });
+        
+        fileDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.remove('border-purple-500', 'bg-purple-500/10');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
 
         // Initial Setup
         createExperienceInput('e.g., Summer nights at the beach');
         createExperienceInput('e.g., First day of school');
-        [albumTitle, document.getElementById('recipient-name')].forEach(el => el.addEventListener('input', updateCreateButton));
+        
+        // Event listeners
+        [albumTitle, document.getElementById('recipient-name')].forEach(el => 
+            el.addEventListener('input', updateCreateButton)
+        );
+        
         fileDropZone.addEventListener('click', () => audioFileInput.click());
         audioFileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
         addExperienceButton.addEventListener('click', () => createExperienceInput());
         createAlbumButton.addEventListener('click', handleSubmit);
         createAnotherButton.addEventListener('click', resetUI);
+        retryButton.addEventListener('click', () => {
+            if (currentJobId) {
+                hideAllPanels();
+                processingPanel.classList.remove('hidden');
+                pollForStatus(currentJobId);
+            } else {
+                resetUI();
+            }
+        });
+        resetButton.addEventListener('click', resetUI);
+        
+        // Prevent form submission on Enter key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+            }
+        });
+        
+        updateCreateButton();
     });
     </script>
 </body>
 </html>
-
-
