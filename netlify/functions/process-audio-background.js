@@ -23,17 +23,21 @@ const memoryThemes = {
     default: { name: 'Magical Remix', filters: 'chorus=0.7:0.9:55:0.4:0.25:2.5,aecho=0.8:0.88:60:0.4' }
 };
 
-export default async (event, context) => {
-    const metadata = JSON.parse(event.body);
+/**
+ * This function contains the long-running audio processing logic.
+ * It's run in the background and does not directly return a response to the client.
+ * @param {object} metadata - The job details from the client.
+ */
+const processAlbumInBackground = async (metadata) => {
     const { jobId, experiences, albumTitle, recipientName } = metadata;
     const store = getStore('audio_uploads');
     let tempFiles = [];
 
     try {
-        // Set initial status for the job.
+        // Set initial status for the job. The client will poll this status.
         await store.setJSON(`${jobId}-metadata`, { ...metadata, status: 'pending' });
         
-        // Download the original audio file to a temporary location.
+        // Download the original audio file to a temporary location for processing.
         const originalFilePath = path.join(os.tmpdir(), `original_${jobId}`);
         tempFiles.push(originalFilePath);
         
@@ -49,7 +53,7 @@ export default async (event, context) => {
         zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}`);
         zip.file('01_original.mp3', fs.createReadStream(originalFilePath));
         
-        // Process the audio for each experience.
+        // Process the audio for each "experience" described by the user.
         for (let i = 0; i < experiences.length; i++) {
             const experienceText = experiences[i];
             let themeKey = 'default';
@@ -78,7 +82,7 @@ export default async (event, context) => {
             zip.file(`${String(i + 2).padStart(2, '0')}_${themeKey}_remix.mp3`, fs.createReadStream(outputFilePath));
         }
 
-        // Generate the zip file and store it.
+        // Generate the final zip file and store it in the blob store.
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', streamFiles: true });
         await store.set(`${jobId}-result`, zipBuffer);
         
@@ -87,11 +91,32 @@ export default async (event, context) => {
         
     } catch (error) {
         console.error('Background Processing Error:', error);
-        // If an error occurs, update the status to 'failed'.
+        // If an error occurs, update the status to 'failed' with the error message.
         await store.setJSON(`${jobId}-metadata`, { ...metadata, status: 'failed', error: error.message });
     } finally {
-        // Clean up temporary files.
+        // Clean up any temporary files created during processing.
         tempFiles.forEach(file => fs.existsSync(file) && fs.unlinkSync(file));
     }
+};
+
+/**
+ * The main function handler. It uses the Fetch-style API (request, context).
+ * It starts the background job and returns an immediate response to the client.
+ */
+export default async (request, context) => {
+    // Parse the job metadata from the incoming request body.
+    const metadata = await request.json();
+    const { jobId } = metadata;
+
+    // Tell Netlify to wait for the processing to finish in the background,
+    // even after we've sent the response to the client.
+    context.waitUntil(processAlbumInBackground(metadata));
+
+    // Immediately return a 202 Accepted response to let the client know
+    // the request was received and is being processed.
+    return Response.json(
+        { message: 'Processing started', jobId },
+        { status: 202 }
+    );
 };
 
