@@ -1,2 +1,7 @@
 [functions]
   directory = "netlify/functions/"
+
+# Increase the timeout for our specific audio processing function
+[functions."process-audio"]
+  timeout = 26
+
