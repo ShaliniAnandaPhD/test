@@ -2,37 +2,30 @@
 import { getStore } from '@netlify/blobs';
 import { v4 as uuidv4 } from 'uuid';
 
-export default async (event, context) => {
-    // The httpMethod is available on the event object.
-    if (event.httpMethod !== 'GET') {
-        return { 
-            statusCode: 405, 
-            body: JSON.stringify({ error: 'Method Not Allowed' }) 
-        };
+export default async (request, context) => {
+    // In v2 functions, the method is on the `request` object.
+    if (request.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
-        // Generate a unique ID for the job.
         const jobId = uuidv4();
-        // Get a reference to the 'audio_uploads' blob store.
         const store = getStore('audio_uploads');
-        // Create a signed URL that allows a client to upload a file directly.
-        // The URL is valid for 900 seconds (15 minutes).
+        // Create a signed URL valid for 15 minutes.
         const { url } = await store.getSignedURL(jobId, { expiresIn: 900 });
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ uploadUrl: url, jobId: jobId }),
-        };
+        // Use Response.json() for a cleaner v2 response.
+        return Response.json({ uploadUrl: url, jobId: jobId });
+
     } catch (error) {
         console.error('URL Generation Error:', error);
-        return { 
-            statusCode: 500, 
-            body: JSON.stringify({ 
-                error: 'Failed to generate a secure upload link.',
-                details: error.message 
-            }) 
-        };
+        return Response.json({ 
+            error: 'Failed to generate a secure upload link.',
+            details: error.message 
+        }, { status: 500 });
     }
 };
 
