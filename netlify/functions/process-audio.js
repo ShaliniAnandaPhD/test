@@ -64,7 +64,7 @@ exports.handler = async (event) => {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    const tempFiles = []; // Keep track of files to clean up
+    let uploadedFilePath = null;
 
     try {
         console.log('Parsing multipart form data...');
@@ -78,16 +78,16 @@ exports.handler = async (event) => {
         if (!uploadedFile || !uploadedFile.filepath) {
             throw new Error('No audio file uploaded or file failed to save.');
         }
-        tempFiles.push(uploadedFile.filepath);
-        console.log(`Uploaded file path: ${uploadedFile.filepath}`);
+        uploadedFilePath = uploadedFile.filepath; // Keep track for cleanup
+        console.log(`Uploaded file path: ${uploadedFilePath}`);
 
         const zip = new JSZip();
-        console.log('Creating readme and adding original file to zip...');
+        console.log('Creating readme and adding original file to zip via stream...');
         zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}\n\nCreated with Memory Album Creator.`);
-        zip.file('01_original.mp3', fs.readFileSync(uploadedFile.filepath));
-        console.log('Original file added.');
+        zip.file('01_original.mp3', fs.createReadStream(uploadedFilePath));
+        console.log('Original file stream added.');
 
-        // FIX: Process each track sequentially to avoid overwhelming server resources
+        // FIX: Process each track sequentially and stream the output directly to the zip file
         for (let i = 0; i < experiences.length; i++) {
             const experienceText = experiences[i];
             console.log(`Starting processing for experience ${i + 1}: "${experienceText}"`);
@@ -100,28 +100,29 @@ exports.handler = async (event) => {
                 }
             }
             const themeData = memoryThemes[selectedThemeKey];
-            const outputFilePath = path.join(os.tmpdir(), `output_${Date.now()}_${i}.mp3`);
-            tempFiles.push(outputFilePath);
-
-            console.log(`Applying FFmpeg filter for track ${i + 1}...`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(uploadedFile.filepath)
-                    .audioFilter(themeData.filters)
-                    .audioCodec('libmp3lame')
-                    .audioBitrate('192k')
-                    .toFormat('mp3')
-                    .on('error', (err) => reject(new Error(`FFmpeg error: ${err.message}`)))
-                    .on('end', () => resolve())
-                    .save(outputFilePath);
-            });
-            console.log(`FFmpeg processing complete for track ${i + 1}. Adding to zip.`);
-            
             const trackFilename = `${String(i + 2).padStart(2, '0')}_${selectedThemeKey}_remix.mp3`;
-            zip.file(trackFilename, fs.readFileSync(outputFilePath));
+
+            console.log(`Applying FFmpeg filter for track ${i + 1} and streaming to zip...`);
+            
+            const ffmpegStream = ffmpeg(uploadedFilePath)
+                .audioFilter(themeData.filters)
+                .audioCodec('libmp3lame')
+                .audioBitrate('192k')
+                .toFormat('mp3')
+                .on('error', (err) => {
+                    // This error handler is crucial for catching ffmpeg-specific issues
+                    console.error(`FFmpeg error during processing for track ${i + 1}:`, err.message);
+                    // We need to reject the promise to stop the loop
+                    throw new Error(`FFmpeg error: ${err.message}`);
+                })
+                .pipe(); // pipe() returns a PassThrough stream
+
+            zip.file(trackFilename, ffmpegStream);
+            console.log(`FFmpeg stream for track ${i + 1} successfully piped to zip.`);
         }
 
-        console.log('All tracks processed. Generating zip file...');
-        const zipData = await zip.generateAsync({ type: 'base64' });
+        console.log('All tracks piped. Generating zip file from streams...');
+        const zipData = await zip.generateAsync({ type: 'base64', streamFiles: true });
         const zipFilename = `${albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'memory_album'}.zip`;
         console.log('Zipping complete. Sending response to client.');
 
@@ -142,16 +143,16 @@ exports.handler = async (event) => {
             body: JSON.stringify({ error: error.message || 'An internal error occurred.' }),
         };
     } finally {
-        console.log('Cleaning up temporary files...');
-        tempFiles.forEach(file => {
+        console.log('Cleaning up temporary file...');
+        if (uploadedFilePath) {
             try {
-                if (fs.existsSync(file)) {
-                    fs.unlinkSync(file);
+                if (fs.existsSync(uploadedFilePath)) {
+                    fs.unlinkSync(uploadedFilePath);
                 }
             } catch (err) {
-                console.error(`Failed to delete temp file: ${file}`, err);
+                console.error(`Failed to delete temp file: ${uploadedFilePath}`, err);
             }
-        });
+        }
         console.log('Cleanup complete.');
     }
 };
