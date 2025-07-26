@@ -1,25 +1,33 @@
 // netlify/functions/download.js
 import { getStore } from '@netlify/blobs';
 
-export default async (event, context) => {
-    // Get the job ID from the query string parameters.
-    const jobId = event.queryStringParameters.id;
+export default async (request, context) => {
+    const url = new URL(request.url);
+    const jobId = url.searchParams.get('id');
+
+    if (!jobId) {
+        return new Response('Job ID is required.', { status: 400 });
+    }
+
     const store = getStore('audio_uploads');
 
     try {
-        // Retrieve the generated zip file from the blob store.
+        // Retrieve the zip file as a Buffer.
         const zipData = await store.get(`${jobId}-result`, { type: 'buffer' });
         if (!zipData) {
-            return { statusCode: 404, body: 'Result not found.' };
+            return new Response('Result not found.', { status: 404 });
         }
-        // Return the zip file to the client.
-        return {
-            statusCode: 200,
-            headers: { 'Content-Type': 'application/zip' },
-            body: zipData.toString('base64'),
-            isBase64Encoded: true,
-        };
+        
+        // Return the zip file with the correct headers.
+        return new Response(zipData, {
+            status: 200,
+            headers: { 
+                'Content-Type': 'application/zip',
+                'Content-Length': zipData.length.toString()
+            },
+        });
+
     } catch (error) {
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        return Response.json({ error: error.message }, { status: 500 });
     }
 };
