@@ -1,29 +1,34 @@
 // netlify/functions/status.js
 import { getStore } from '@netlify/blobs';
 
-export default async (event, context) => {
-    // Get the job ID from the query string parameters.
-    const jobId = event.queryStringParameters.id;
+export default async (request, context) => {
+    // In v2, URL parameters are accessed via the URL object.
+    const url = new URL(request.url);
+    const jobId = url.searchParams.get('id');
+    
+    if (!jobId) {
+        return Response.json({ error: 'Job ID is required.' }, { status: 400 });
+    }
+
     const store = getStore('audio_uploads');
     
     try {
-        // Retrieve the metadata for the job.
         const metadata = await store.getJSON(`${jobId}-metadata`);
         if (!metadata) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Job not found.' }) };
+            return Response.json({ error: 'Job not found.' }, { status: 404 });
         }
-        // Return the current status and other details of the job.
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                status: metadata.status,
-                error: metadata.error,
-                albumTitle: metadata.albumTitle,
-                filename: `${metadata.albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.zip`
-            }),
-        };
+        
+        // Return the job status using Response.json().
+        return Response.json({
+            status: metadata.status,
+            error: metadata.error,
+            albumTitle: metadata.albumTitle,
+            filename: `${metadata.albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.zip`
+        });
+
     } catch (error) {
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        return Response.json({ error: error.message }, { status: 500 });
     }
 };
+
 
