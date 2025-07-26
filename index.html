@@ -210,32 +210,30 @@
             processingPanel.classList.remove('hidden');
             
             try {
-                processingHeader.textContent = 'Preparing Upload...';
-                processingStatus.textContent = 'Getting a secure link to upload your file.';
+                // Step 1: Generate a unique job ID on the client side.
+                const jobId = crypto.randomUUID();
 
-                const urlResponse = await fetch('/.netlify/functions/generate-upload-url');
-                
-                if (!urlResponse.ok) {
-                    const err = new Error('Server returned an error during URL generation.');
-                    err.response = urlResponse;
-                    throw err;
-                }
+                processingHeader.textContent = 'Uploading...';
+                processingStatus.textContent = 'Uploading your audio file directly.';
 
-                const { uploadUrl, jobId } = await urlResponse.json();
-
-                processingStatus.textContent = 'Uploading your audio file...';
-                const uploadResponse = await fetch(uploadUrl, {
-                    method: 'PUT',
-                    body: inputFile,
-                    headers: { 'Content-Type': 'application/octet-stream' }
+                // Step 2: Upload the file directly to our new upload function.
+                const uploadResponse = await fetch('/.netlify/functions/upload', {
+                    method: 'POST',
+                    headers: {
+                        'x-job-id': jobId // Pass the jobId in a custom header
+                    },
+                    body: inputFile
                 });
+
                 if (!uploadResponse.ok) {
-                     const err = new Error('Server returned an error during file upload.');
+                    const err = new Error('Server returned an error during file upload.');
                     err.response = uploadResponse;
                     throw err;
                 }
 
                 processingStatus.textContent = 'Starting the album creation process...';
+                
+                // Step 3: Kick off the background processing job with the same jobId.
                 const metadata = {
                     jobId,
                     albumTitle: document.getElementById('album-title').value,
