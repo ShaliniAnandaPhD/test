@@ -1,15 +1,23 @@
 // netlify/functions/generate-upload-url.js
-const { getStore } = require('@netlify/blobs');
-const { v4: uuidv4 } = require('uuid');
+import { getStore } from '@netlify/blobs';
+import { v4 as uuidv4 } from 'uuid';
 
-exports.handler = async (event) => {
+export default async (event, context) => {
+    // The httpMethod is available on the event object.
     if (event.httpMethod !== 'GET') {
-        return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+        return { 
+            statusCode: 405, 
+            body: JSON.stringify({ error: 'Method Not Allowed' }) 
+        };
     }
 
     try {
+        // Generate a unique ID for the job.
         const jobId = uuidv4();
+        // Get a reference to the 'audio_uploads' blob store.
         const store = getStore('audio_uploads');
+        // Create a signed URL that allows a client to upload a file directly.
+        // The URL is valid for 900 seconds (15 minutes).
         const { url } = await store.getSignedURL(jobId, { expiresIn: 900 });
 
         return {
