@@ -3,42 +3,42 @@ const { getStore } = require('@netlify/blobs');
 const Busboy = require('busboy');
 const { v4: uuidv4 } = require('uuid');
 
-function parseMultipartForm(event) {
-    return new Promise((resolve) => {
-        const busboy = Busboy({ headers: { 'content-type': event.headers['content-type'] } });
-        const fields = {};
-        let uploadData = null;
+exports.handler = async (event) => {
+    const jobId = uuidv4();
+    const store = getStore('audio_uploads');
+    const fields = {};
 
-        busboy.on('file', (fieldname, file, { filename }) => {
-            const chunks = [];
-            file.on('data', (chunk) => chunks.push(chunk));
-            file.on('end', () => {
-                uploadData = {
-                    content: Buffer.concat(chunks),
-                    filename: filename,
-                };
+    try {
+        await new Promise((resolve, reject) => {
+            const busboy = Busboy({ headers: { 'content-type': event.headers['content-type'] || event.headers['Content-Type'] } });
+
+            busboy.on('file', async (fieldname, file, { filename }) => {
+                try {
+                    // FIX: Stream the upload directly to Netlify Blobs to handle large files
+                    await store.set(jobId, file);
+                    fields.originalFilename = filename; // Store filename for metadata
+                } catch (err) {
+                    console.error('Blob store streaming error:', err);
+                    reject(err);
+                }
             });
+
+            busboy.on('field', (fieldname, val) => {
+                fields[fieldname] = val;
+            });
+
+            busboy.on('finish', resolve);
+            busboy.on('error', reject);
+            busboy.end(Buffer.from(event.body, 'base64'));
         });
 
-        busboy.on('field', (fieldname, val) => (fields[fieldname] = val));
-        busboy.on('finish', () => resolve({ fields, uploadData }));
-        busboy.end(Buffer.from(event.body, 'base64'));
-    });
-}
-
-exports.handler = async (event) => {
-    try {
-        const { fields, uploadData } = await parseMultipartForm(event);
-        const jobId = uuidv4();
-        const store = getStore('audio_uploads');
-
-        // Store the original audio file
-        await store.set(jobId, uploadData.content);
+        if (!fields.originalFilename) {
+            throw new Error("No file was uploaded.");
+        }
 
         // Store the job metadata (form fields)
         await store.setJSON(`${jobId}-metadata`, {
             ...fields,
-            originalFilename: uploadData.filename,
             status: 'pending',
             submittedAt: new Date().toISOString(),
         });
@@ -56,7 +56,8 @@ exports.handler = async (event) => {
         );
         
         if (!response.ok) {
-            throw new Error('Failed to invoke background function.');
+            const errorText = await response.text();
+            throw new Error(`Failed to invoke background function: ${errorText}`);
         }
 
         return {
@@ -65,6 +66,15 @@ exports.handler = async (event) => {
         };
     } catch (error) {
         console.error('Upload Error:', error);
+        // If we have a jobId, try to clean up
+        if (jobId) {
+            try {
+                await store.delete(jobId);
+                await store.delete(`${jobId}-metadata`);
+            } catch (cleanupError) {
+                console.error('Cleanup error:', cleanupError);
+            }
+        }
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
