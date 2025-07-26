@@ -1,0 +1,134 @@
+const { Busboy } = require('@busboy/body-parser');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+const JSZip = require('jszip');
+
+// Tell fluent-ffmpeg where to find the ffmpeg binary
+ffmpeg.setFfmpegPath(ffmpegStatic);
+
+// Helper to parse multipart form data
+function parseMultipartForm(event) {
+    return new Promise((resolve, reject) => {
+        const busboy = Busboy({
+            headers: { 'content-type': event.headers['content-type'] }
+        });
+        const fields = {};
+        const uploads = {};
+
+        busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
+            const saveTo = path.join(os.tmpdir(), `upload_${Date.now()}_${filename.filename}`);
+            const writeStream = fs.createWriteStream(saveTo);
+            file.pipe(writeStream);
+
+            writeStream.on('finish', () => {
+                uploads[fieldname] = { filepath: saveTo, filename: filename.filename };
+            });
+        });
+
+        busboy.on('field', (fieldname, val) => {
+            fields[fieldname] = val;
+        });
+
+        busboy.on('finish', () => {
+            resolve({ fields, uploads });
+        });
+        
+        busboy.on('error', err => {
+            reject(err);
+        });
+
+        busboy.end(Buffer.from(event.body, 'base64'));
+    });
+}
+
+// Pre-defined themes with FFmpeg audio filters
+const memoryThemes = {
+    childhood: { icon: '🧸', name: 'Childhood Memory', filters: 'asetrate=44100*1.2,aresample=44100,highpass=f=300,aecho=0.8:0.88:60:0.4,chorus=0.5:0.9:50:0.4:0.25:2' },
+    love: { icon: '💌', name: 'First Love', filters: 'aphaser=type=t:speed=0.5:decay=0.4,chorus=0.6:0.9:50:0.3:0.25:1.5,equalizer=f=2000:t=h:w=2000:g=3' },
+    adventure: { icon: '🚀', name: 'Adventure', filters: 'equalizer=f=100:t=h:w=200:g=5,equalizer=f=3000:t=h:w=2000:g=3,aecho=0.8:0.9:1000:0.3' },
+    party: { icon: '🎉', name: 'Celebration', filters: 'equalizer=f=80:t=h:w=100:g=8,equalizer=f=4000:t=h:w=2000:g=4,stereotools=mlev=1.5' },
+    nostalgic: { icon: '📸', name: 'Nostalgic', filters: 'asetrate=44100*0.95,aresample=44100,lowpass=f=3000,aecho=0.8:0.88:40:0.5,aphaser=type=t:speed=0.3' },
+    peaceful: { icon: '🌅', name: 'Peaceful', filters: 'lowpass=f=2000,volume=0.7,aecho=0.8:0.88:120:0.3,atempo=0.9' },
+    dreamy: { icon: '🌙', name: 'Dreamy', filters: 'aphaser=type=t:speed=0.2:decay=0.6,aecho=0.9:0.95:200:0.4,flanger=speed=0.5:depth=3' },
+    energetic: { icon: '⚡', name: 'Energetic', filters: 'equalizer=f=100:t=h:w=200:g=10,equalizer=f=5000:t=h:w=3000:g=5,atempo=1.1,stereotools=mlev=1.8' },
+    default: { icon: '✨', name: 'Magical Remix', filters: 'chorus=0.7:0.9:55:0.4:0.25:2.5,aecho=0.8:0.88:60:0.4' }
+};
+
+// Main serverless function handler
+exports.handler = async (event) => {
+    if (event.httpMethod !== 'POST') {
+        return { statusCode: 405, body: 'Method Not Allowed' };
+    }
+
+    const tempFiles = []; // Keep track of files to clean up
+
+    try {
+        const { fields, uploads } = await parseMultipartForm(event);
+        const { albumTitle, recipientName } = fields;
+        const experiences = JSON.parse(fields.experiences);
+        const uploadedFile = uploads.audio;
+
+        if (!uploadedFile) {
+            throw new Error('No audio file uploaded.');
+        }
+        tempFiles.push(uploadedFile.filepath);
+
+        const zip = new JSZip();
+        zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}\n\nCreated with Memory Album Creator.`);
+        zip.file('01_original.mp3', fs.readFileSync(uploadedFile.filepath));
+
+        for (let i = 0; i < experiences.length; i++) {
+            const experienceText = experiences[i];
+            let selectedThemeKey = 'default';
+            for (const key in memoryThemes) {
+                if (experienceText.toLowerCase().includes(key)) {
+                    selectedThemeKey = key;
+                    break;
+                }
+            }
+            const themeData = memoryThemes[selectedThemeKey];
+            const outputFilePath = path.join(os.tmpdir(), `output_${i}.mp3`);
+            tempFiles.push(outputFilePath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(uploadedFile.filepath)
+                    .audioFilter(themeData.filters)
+                    .audioCodec('libmp3lame')
+                    .audioBitrate('192k')
+                    .toFormat('mp3')
+                    .on('error', (err) => reject(err))
+                    .on('end', () => resolve())
+                    .save(outputFilePath);
+            });
+            
+            const trackFilename = `${String(i + 2).padStart(2, '0')}_${selectedThemeKey}_remix.mp3`;
+            zip.file(trackFilename, fs.readFileSync(outputFilePath));
+        }
+
+        const zipData = await zip.generateAsync({ type: 'base64' });
+        const zipFilename = `${albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'memory_album'}.zip`;
+
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                zip: zipData,
+                filename: zipFilename,
+                albumTitle: albumTitle
+            }),
+        };
+
+    } catch (error) {
+        console.error('Error:', error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: error.message || 'An internal error occurred.' }),
+        };
+    } finally {
+        // Cleanup temporary files
+        tempFiles.forEach(file => fs.unlinkSync(file));
+    }
+};
