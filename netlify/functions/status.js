@@ -1,9 +1,9 @@
 // netlify/functions/status.js
-const { getStore: getStoreStatus } = require('@netlify/blobs');
+import { getStore } from '@netlify/blobs';
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
     const jobId = event.queryStringParameters.id;
-    const store = getStoreStatus('audio_uploads');
+    const store = getStore('audio_uploads');
     
     try {
         const metadata = await store.getJSON(`${jobId}-metadata`);
@@ -23,3 +23,4 @@ exports.handler = async (event) => {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
+
