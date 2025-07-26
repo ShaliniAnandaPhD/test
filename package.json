@@ -2,12 +2,10 @@
   "name": "memory-album-function",
   "version": "1.0.0",
   "dependencies": {
-    "busboy": "^1.6.0",
     "fluent-ffmpeg": "^2.1.2",
     "ffmpeg-static": "^5.2.0",
     "jszip": "^3.10.1",
     "uuid": "^9.0.1"
   }
 }
-
 
