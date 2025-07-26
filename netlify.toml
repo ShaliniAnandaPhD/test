@@ -10,10 +10,11 @@
     # Use Node.js 18 for compatibility with dependencies
     NODE_VERSION = "18"
 
-# Configuration for Netlify Functions
-[functions]
-  directory = "netlify/functions/"
+# Configuration for ALL Netlify Functions
+[functions."*"]
   node_bundler = "esbuild"
+  # FIX: Mark @netlify/blobs as an external module that shouldn't be bundled.
+  external_node_modules = ["@netlify/blobs"]
 
 # Enable Netlify Blob Storage
 [stores]
@@ -22,4 +23,5 @@
 
 # NOTE: The background function is automatically detected by its filename
 # ending in "-background.js", so no extra configuration is needed here.
+
 
