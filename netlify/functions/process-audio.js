@@ -84,7 +84,8 @@ exports.handler = async (event) => {
         const zip = new JSZip();
         console.log('Creating readme and adding original file to zip...');
         zip.file('readme.txt', `Album: ${albumTitle}\nFor: ${recipientName}\n\nCreated with Memory Album Creator.`);
-        zip.file('01_original.mp3', fs.readFileSync(uploadedFile.filepath));
+        // Use a stream for the original file to keep memory low
+        zip.file('01_original.mp3', fs.createReadStream(uploadedFile.filepath));
         console.log('Original file added.');
 
         for (let i = 0; i < experiences.length; i++) {
@@ -99,28 +100,22 @@ exports.handler = async (event) => {
                 }
             }
             const themeData = memoryThemes[selectedThemeKey];
-            const outputFilePath = path.join(os.tmpdir(), `output_${Date.now()}_${i}.mp3`);
-            tempFiles.push(outputFilePath);
+            const trackFilename = `${String(i + 2).padStart(2, '0')}_${selectedThemeKey}_remix.mp3`;
 
             console.log(`Applying FFmpeg filter for track ${i + 1}...`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(uploadedFile.filepath)
-                    .audioFilter(themeData.filters)
-                    .audioCodec('libmp3lame')
-                    .audioBitrate('192k')
-                    .toFormat('mp3')
-                    .on('error', (err) => reject(new Error(`FFmpeg error: ${err.message}`)))
-                    .on('end', () => resolve())
-                    .save(outputFilePath);
-            });
-            console.log(`FFmpeg processing complete for track ${i + 1}. Adding to zip.`);
-            
-            const trackFilename = `${String(i + 2).padStart(2, '0')}_${selectedThemeKey}_remix.mp3`;
-            zip.file(trackFilename, fs.readFileSync(outputFilePath));
+            const ffmpegStream = ffmpeg(uploadedFile.filepath)
+                .audioFilter(themeData.filters)
+                .audioCodec('libmp3lame')
+                .audioBitrate('192k')
+                .toFormat('mp3');
+
+            // Add the processed audio stream directly to the zip file
+            zip.file(trackFilename, ffmpegStream);
+            console.log(`FFmpeg stream for track ${i + 1} piped to zip.`);
         }
 
         console.log('All tracks processed. Generating zip file...');
-        const zipData = await zip.generateAsync({ type: 'base64' });
+        const zipData = await zip.generateAsync({ type: 'base64', streamFiles: true });
         const zipFilename = `${albumTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'memory_album'}.zip`;
         console.log('Zipping complete. Sending response to client.');
 
@@ -154,5 +149,4 @@ exports.handler = async (event) => {
         console.log('Cleanup complete.');
     }
 };
-
 
