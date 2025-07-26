@@ -1,11 +1,11 @@
 // netlify/functions/process-audio-background.js
-import { getStore } from '@netlify/blobs';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
-import JSZip from 'jszip';
+const { getStore } = require('@netlify/blobs');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+const JSZip = require('jszip');
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -21,7 +21,7 @@ const memoryThemes = {
     default: { name: 'Magical Remix', filters: 'chorus=0.7:0.9:55:0.4:0.25:2.5,aecho=0.8:0.88:60:0.4' }
 };
 
-export const handler = async (event) => {
+exports.handler = async (event) => {
     const metadata = JSON.parse(event.body);
     const { jobId, experiences, albumTitle, recipientName } = metadata;
     const store = getStore('audio_uploads');
@@ -83,3 +83,4 @@ export const handler = async (event) => {
         tempFiles.forEach(file => fs.existsSync(file) && fs.unlinkSync(file));
     }
 };
+
